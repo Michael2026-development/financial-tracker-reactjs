@@ -1,0 +1,15 @@
+{
+    "name": "family-finance-monorepo",
+    "private": true,
+    "workspaces": [
+        "apps/*"
+    ],
+    "scripts": {
+        "dev": "npm run dev --workspace=apps/web",
+        "build": "npm run build --workspaces",
+        "lint": "npm run lint --workspaces"
+    },
+    "devDependencies": {
+        "vite-plugin-pwa": "^1.2.0"
+    }
+}
