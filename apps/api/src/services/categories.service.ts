@@ -1,7 +1,7 @@
 import { eq, and, sql, desc } from "drizzle-orm";
-import { db } from "../db";
-import { category, transaction } from "../db/schema";
-import { NotFoundError } from "../middleware/error.middleware";
+import { db } from "../db/index.js";
+import { category, transaction } from "../db/schema.js";
+import { NotFoundError } from "../middleware/error.middleware.js";
 
 export interface CreateCategoryDto {
     name: string;

@@ -2,9 +2,9 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./auth";
-import routes from "./routes";
-import { errorHandler } from "./middleware/error.middleware";
+import { auth } from "./auth/index.js";
+import routes from "./routes/index.js";
+import { errorHandler } from "./middleware/error.middleware.js";
 
 export function createApp() {
     const app = express();

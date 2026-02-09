@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth.middleware";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
-import categoriesRoutes from "./categories.routes";
-import transactionsRoutes from "./transactions.routes";
-import reportsRoutes from "./reports.routes";
-import notificationsRoutes from "./notifications.routes";
-import settingsRoutes from "./settings.routes";
-import receiptsRoutes from "./receipts.routes";
+import categoriesRoutes from "./categories.routes.js";
+import transactionsRoutes from "./transactions.routes.js";
+import reportsRoutes from "./reports.routes.js";
+import notificationsRoutes from "./notifications.routes.js";
+import settingsRoutes from "./settings.routes.js";
+import receiptsRoutes from "./receipts.routes.js";
 
 const router = Router();
 

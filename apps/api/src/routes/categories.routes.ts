@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { CategoriesService } from "../services/categories.service";
+import { CategoriesService } from "../services/categories.service.js";
 
 const router = Router();
 const service = new CategoriesService();

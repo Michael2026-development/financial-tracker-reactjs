@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { auth, type Session, type User } from "../auth";
+import { auth, type Session, type User } from "../auth/index.js";
 import { fromNodeHeaders } from "better-auth/node";
 
 // Extend Express Request type to include user and session

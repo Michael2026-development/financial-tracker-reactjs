@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { userSettings, user } from "../db/schema";
-import { NotFoundError } from "../middleware/error.middleware";
+import { db } from "../db/index.js";
+import { userSettings, user } from "../db/schema.js";
+import { NotFoundError } from "../middleware/error.middleware.js";
 
 export interface UpdateSettingsDto {
     currency?: string;

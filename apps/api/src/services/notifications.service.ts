@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
-import { db } from "../db";
-import { notification } from "../db/schema";
-import { NotFoundError } from "../middleware/error.middleware";
+import { db } from "../db/index.js";
+import { notification } from "../db/schema.js";
+import { NotFoundError } from "../middleware/error.middleware.js";
 
 export interface CreateNotificationDto {
     title: string;

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { SettingsService } from "../services/settings.service";
+import { SettingsService } from "../services/settings.service.js";
 
 const router = Router();
 const service = new SettingsService();

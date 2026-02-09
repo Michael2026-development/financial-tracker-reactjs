@@ -1,7 +1,7 @@
 import { eq, and, sql, desc, like, or } from "drizzle-orm";
-import { db } from "../db";
-import { transaction, transactionItem } from "../db/schema";
-import { NotFoundError } from "../middleware/error.middleware";
+import { db } from "../db/index.js";
+import { transaction, transactionItem } from "../db/schema.js";
+import { NotFoundError } from "../middleware/error.middleware.js";
 
 export interface CreateTransactionItemDto {
     productNumber: number;

@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db } from "../db/index.js";
+import { transaction, transactionItem } from "../db/schema.js";
+import { CategoriesService } from "./categories.service.js";
 
 export interface ScannedItem {
     name: string;

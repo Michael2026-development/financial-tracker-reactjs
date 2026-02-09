@@ -1,6 +1,6 @@
 import { eq, and, sql, desc } from "drizzle-orm";
-import { db } from "../db";
-import { transaction, category } from "../db/schema";
+import { db } from "../db/index.js";
+import { transaction, category } from "../db/schema.js";
 
 export interface BudgetStatus {
     categoryId: string;
