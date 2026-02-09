@@ -1,57 +1,41 @@
-import { clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs) {
-    return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount, locale = 'id-ID', currency = 'IDR') {
-    return new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount)
+export const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-export function formatDate(date, locale = 'id-ID') {
-    return new Date(date).toLocaleDateString(locale, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    })
+export const getBudgetStatus = (spent, budget) => {
+  const percentage = budget > 0 ? (spent / budget) * 100 : 0;
+
+  if (spent > budget) {
+    return { status: 'DANGER', label: 'Over Limit' };
+  } else if (percentage >= 80) {
+    return { status: 'WARNING', label: 'Near Limit' };
+  } else {
+    return { status: 'SAFE', label: 'Safe' };
+  }
 }
 
-export function generateSessionId() {
-    const now = new Date()
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
-    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0')
-    return `STR-${dateStr}${random}`
+export const generateSessionId = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-export function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0
-        const v = c === 'x' ? r : (r & 0x3 | 0x8)
-        return v.toString(16)
-    })
-}
-
-export function debounce(func, wait) {
-    let timeout
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout)
-            func(...args)
-        }
-        clearTimeout(timeout)
-        timeout = setTimeout(later, wait)
-    }
-}
-
-export function getBudgetStatus(spent, budget) {
-    const percentage = (spent / budget) * 100
-    if (percentage > 100) return { status: 'DANGER', color: 'var(--color-accent-danger)', label: 'Overbudget!' }
-    if (percentage > 80) return { status: 'WARNING', color: 'var(--color-accent-warning)', label: 'Hampir Habis' }
-    return { status: 'SAFE', color: 'var(--color-accent-success)', label: 'Aman' }
+export const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }

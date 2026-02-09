@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import { revokeImagePreview } from '@/services/receiptScanner'
+import { useCategories } from '@/hooks/useCategories'
 import clsx from 'clsx'
 
 const ScanConfirmModal = ({ isOpen, onClose, scanData, onConfirm }) => {
     const [items, setItems] = useState([])
     const [editingId, setEditingId] = useState(null)
+    const [selectedCategory, setSelectedCategory] = useState(null)
+
+    const { data: categoriesData } = useCategories()
+    const categories = categoriesData || []
 
     useEffect(() => {
         if (scanData?.items) {
             setItems(scanData.items)
         }
-    }, [scanData])
+        // Set default category to first available
+        if (categories.length > 0 && !selectedCategory) {
+            setSelectedCategory(categories[0].id)
+        }
+    }, [scanData, categories, selectedCategory])
 
     // Cleanup preview URL when modal closes
     useEffect(() => {
@@ -43,7 +52,12 @@ const ScanConfirmModal = ({ isOpen, onClose, scanData, onConfirm }) => {
     }
 
     const handleConfirm = () => {
-        onConfirm(items)
+        // Apply selected category to all items
+        const itemsWithCategory = items.map(item => ({
+            ...item,
+            category: selectedCategory
+        }))
+        onConfirm(itemsWithCategory)
         onClose()
     }
 
@@ -53,181 +67,232 @@ const ScanConfirmModal = ({ isOpen, onClose, scanData, onConfirm }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                 onClick={onClose}
             />
 
-            {/* Modal */}
-            <div className="relative bg-white dark:bg-surface-dark rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-200">
+            {/* Modal Container - Mobile Card Style */}
+            <div className="relative w-full max-w-[430px] max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 ring-1 ring-slate-900/5">
+
                 {/* Header */}
-                <header className="p-6 border-b border-slate-200 dark:border-border-dark flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
-                            <span className="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white">Confirm Scanned Items</h3>
-                                {scanData?.aiProvider && (
-                                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
-                                        {scanData.aiProvider}
-                                    </span>
-                                )}
-                                {scanData?.confidence && (
-                                    <span className={clsx(
-                                        "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
-                                        scanData.confidence >= 0.8 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
-                                    )}>
-                                        {Math.round(scanData.confidence * 100)}% Confident
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Review and edit items from {scanData?.storeName || 'receipt'}
-                            </p>
-                        </div>
-                    </div>
+                <header className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 p-4 flex items-center">
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 transition-colors cursor-pointer"
+                        className="size-10 flex items-center justify-center -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
                     >
-                        <span className="material-symbols-outlined">close</span>
+                        <span className="material-symbols-outlined">arrow_back</span>
                     </button>
+                    <div className="flex-1 text-center pr-8">
+                        <h1 className="text-lg font-bold text-slate-900 dark:text-white">Confirm Scanned Items</h1>
+                    </div>
                 </header>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    <div className="flex flex-col lg:flex-row gap-6">
-                        {/* Receipt Preview */}
-                        {scanData?.imagePreview && (
-                            <div className="lg:w-48 shrink-0">
-                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Receipt Preview</p>
-                                <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-border-dark">
+                {/* Main Content - Scrollable */}
+                <main className="flex-1 overflow-y-auto custom-scrollbar">
+
+                    {/* Receipt Preview Section */}
+                    {scanData?.imagePreview && (
+                        <section className="p-5 pb-2">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Receipt Preview</h3>
+                                <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded">
+                                    {scanData?.confidence ? `${Math.round(scanData.confidence * 100)}% Match` : 'Scanned'}
+                                </span>
+                            </div>
+                            <div className="relative rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 group">
+                                <div className="h-[240px] w-full overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-800/50">
                                     <img
                                         src={scanData.imagePreview}
-                                        alt="Receipt"
-                                        className="w-full h-auto max-h-64 object-cover"
+                                        alt="Receipt Preview"
+                                        className="w-full h-full object-contain"
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
                                 </div>
+                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             </div>
-                        )}
+                        </section>
+                    )}
 
-                        {/* Items Table */}
-                        <div className="flex-1">
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                                Extracted Items ({items.length})
-                            </p>
+                    {/* Extracted Items Section */}
+                    <section className="p-5 pt-2 pb-44">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Extracted Items ({items.length})</h3>
+                        </div>
 
-                            {items.length > 0 ? (
-                                <div className="space-y-3">
-                                    {items.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className={clsx(
-                                                "p-4 rounded-xl border transition-all",
-                                                editingId === item.id
-                                                    ? "border-primary bg-primary/5"
-                                                    : "border-slate-200 dark:border-border-dark bg-slate-50 dark:bg-slate-900/50"
-                                            )}
-                                        >
-                                            {editingId === item.id ? (
-                                                <div className="space-y-3">
+                        <div className="space-y-3">
+                            {items.length > 0 ? items.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className={clsx(
+                                        "p-4 rounded-2xl border transition-all duration-200",
+                                        editingId === item.id
+                                            ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10 ring-1 ring-indigo-500/20"
+                                            : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50"
+                                    )}
+                                >
+                                    {editingId === item.id ? (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Item Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.name}
+                                                    onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
+                                                    className="w-full mt-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    placeholder="Item name"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Qty</label>
                                                     <input
-                                                        type="text"
-                                                        value={item.name}
-                                                        onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                                                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-border-dark text-sm focus:ring-2 focus:ring-primary outline-none"
-                                                        placeholder="Item name"
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleItemChange(item.id, 'quantity', Number(e.target.value))}
+                                                        className="w-full mt-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                                                     />
-                                                    <div className="grid grid-cols-3 gap-3">
-                                                        <input
-                                                            type="number"
-                                                            value={item.quantity}
-                                                            onChange={(e) => handleItemChange(item.id, 'quantity', Number(e.target.value))}
-                                                            className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-border-dark text-sm focus:ring-2 focus:ring-primary outline-none"
-                                                            placeholder="Qty"
-                                                            min="1"
-                                                        />
-                                                        <input
-                                                            type="number"
-                                                            value={item.price}
-                                                            onChange={(e) => handleItemChange(item.id, 'price', Number(e.target.value))}
-                                                            className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-border-dark text-sm focus:ring-2 focus:ring-primary outline-none font-mono"
-                                                            placeholder="Price"
-                                                        />
-                                                        <button
-                                                            onClick={() => setEditingId(null)}
-                                                            className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors cursor-pointer"
-                                                        >
-                                                            Done
-                                                        </button>
-                                                    </div>
                                                 </div>
-                                            ) : (
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-slate-900 dark:text-white truncate">{item.name}</p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                            {item.quantity} × {formatCurrency(item.price)}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold font-mono text-slate-900 dark:text-white">
-                                                            {formatCurrency(item.total)}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => setEditingId(item.id)}
-                                                            className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 transition-colors cursor-pointer"
-                                                        >
-                                                            <span className="material-symbols-outlined text-lg">edit</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteItem(item.id)}
-                                                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-500/10 text-red-500 transition-colors cursor-pointer"
-                                                        >
-                                                            <span className="material-symbols-outlined text-lg">delete</span>
-                                                        </button>
-                                                    </div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Price</label>
+                                                    <input
+                                                        type="number"
+                                                        value={item.price}
+                                                        onChange={(e) => handleItemChange(item.id, 'price', Number(e.target.value))}
+                                                        className="w-full mt-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    />
                                                 </div>
-                                            )}
+                                            </div>
+                                            <div className="flex justify-end pt-1">
+                                                <button
+                                                    onClick={() => setEditingId(null)}
+                                                    className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))}
+                                    ) : (
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">{item.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded">
+                                                        {item.quantity}x
+                                                    </span>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                                                        {formatCurrency(item.price)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                                    {formatCurrency(item.total)}
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => setEditingId(item.id)}
+                                                        className="p-2 text-slate-300 hover:text-indigo-500 transition-colors rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                                                    >
+                                                        <span className="material-symbols-outlined text-xl">edit_square</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteItem(item.id)}
+                                                        className="p-2 text-slate-300 hover:text-red-500 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                    >
+                                                        <span className="material-symbols-outlined text-xl">delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="text-center py-8 text-slate-400">
-                                    <span className="material-symbols-outlined text-4xl mb-2">inventory_2</span>
-                                    <p>No items to add</p>
+                            )) : (
+                                <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                                    <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600 mb-2"> receipt_long </span>
+                                    <p className="text-slate-400 dark:text-slate-500 text-sm">No items found.</p>
                                 </div>
                             )}
                         </div>
-                    </div>
-                </div>
+                    </section>
+                </main>
 
-                {/* Footer */}
-                <footer className="p-6 border-t border-slate-200 dark:border-border-dark flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shrink-0 bg-slate-50 dark:bg-slate-900/50">
-                    <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <span className="text-sm text-slate-500 dark:text-slate-400">Total Amount:</span>
-                        <span className="text-xl font-black text-primary font-mono">{formatCurrency(totalAmount)}</span>
+                {/* Footer - Fixed at bottom */}
+                <footer className="flex-shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 p-6 pb-8">
+                    <div className="flex items-center justify-between mb-5 px-1">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Total Amount</span>
+                            <span className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-none mt-1">
+                                {formatCurrency(totalAmount)}
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full ring-1 ring-emerald-100 dark:ring-emerald-900/30">
+                                Scanned Successfully
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-border-dark text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                        >
-                            Cancel
-                        </button>
+
+
+                    <div className="flex flex-col gap-4">
+                        {/* Category Selector */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block px-1">
+                                Category for All Items
+                            </label>
+                            <select
+                                value={selectedCategory || ''}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="w-full h-12 px-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 0.75rem center',
+                                    backgroundSize: '1.25rem'
+                                }}
+                            >
+                                <option value="" disabled>Select a category...</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.icon} {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <button
                             onClick={handleConfirm}
-                            disabled={items.length === 0}
-                            className="px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                            disabled={!selectedCategory || items.length === 0}
+                            className="w-full h-14 rounded-2xl bg-indigo-600 text-white font-bold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/20 active:scale-[0.98] transition-all hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <span className="material-symbols-outlined text-lg">add_circle</span>
+                            <span className="material-symbols-outlined">add_circle</span>
                             Add All Items ({items.length})
+                        </button>
+
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 text-slate-500 dark:text-slate-400 font-bold text-sm hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        >
+                            Discard Selection
                         </button>
                     </div>
                 </footer>
             </div>
+
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 10px;
+                }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #475569;
+                }
+            `}</style>
         </div>
     )
 }

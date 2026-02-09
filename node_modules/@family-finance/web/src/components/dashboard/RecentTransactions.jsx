@@ -1,15 +1,28 @@
 import { Link } from 'react-router-dom'
-import { useTransactionStore } from '@/stores/useTransactionStore'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { formatCurrency } from '@/lib/utils'
 
 const RecentTransactions = () => {
+    const { data: transactionsData, isLoading } = useTransactions({ limit: 5 })
+    const { data: categoriesData } = useCategories()
 
-    const { transactions, getCategory } = useTransactionStore()
+    // API returns array directly
+    const transactions = Array.isArray(transactionsData) ? transactionsData : []
+    const categories = categoriesData || []
 
-    // Get the most recent 5 transactions
-    const recentTransactions = [...transactions]
-        .sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))
-        .slice(0, 5)
+    const getCategory = (id) => categories.find(cat => cat.id === id)
+
+    if (isLoading) {
+        return (
+            <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark p-6">
+                <div className="animate-pulse space-y-4">
+                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+                    <div className="h-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark overflow-hidden shadow-sm">
@@ -28,11 +41,12 @@ const RecentTransactions = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-border-dark">
-                        {recentTransactions.length > 0 ? (
-                            recentTransactions.map(transaction => {
-                                const category = getCategory(transaction.category_id)
-                                const isIncome = transaction.category_id === 'income' || (category && category.name === 'Income')
-                                const dateObj = new Date(transaction.transaction_date)
+                        {transactions.length > 0 ? (
+                            transactions.map(transaction => {
+                                // Use camelCase field names from API
+                                const category = getCategory(transaction.categoryId)
+                                const isIncome = transaction.categoryId === 'income' || (category && category.name === 'Income')
+                                const dateObj = new Date(transaction.transactionDate)
                                 const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                 const amountClass = isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
                                 const amountPrefix = isIncome ? "+" : "-"
@@ -58,7 +72,7 @@ const RecentTransactions = () => {
                                             </span>
                                         </td>
                                         <td className={`px-6 py-4 text-right font-bold font-mono whitespace-nowrap ${amountClass}`}>
-                                            {amountPrefix}{formatCurrency(transaction.total_price)}
+                                            {amountPrefix}{formatCurrency(transaction.totalPrice)}
                                         </td>
                                     </tr>
                                 )
@@ -66,7 +80,7 @@ const RecentTransactions = () => {
                         ) : (
                             <tr>
                                 <td colSpan="4" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400 italic">
-                                    No transactions yet.
+                                    No recent transactions
                                 </td>
                             </tr>
                         )}

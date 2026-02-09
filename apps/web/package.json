@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@tanstack/react-query": "^5.90.20",
+    "better-auth": "^1.4.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",

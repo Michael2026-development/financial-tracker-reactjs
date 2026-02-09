@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from '@/components/layout/MainLayout'
 import Dashboard from '@/pages/Dashboard'
@@ -9,11 +10,33 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Reports from '@/pages/Reports'
 import SearchResults from '@/pages/SearchResults'
+import ResetData from '@/pages/ResetData'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 function App() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
+  // System Dark Mode Detection
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const handleChange = (e) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+
+    // Initial check
+    handleChange(mediaQuery)
+
+    // Listen for changes
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
 
   return (
     <BrowserRouter>
@@ -37,6 +60,7 @@ function App() {
           <Route path="categories" element={<Categories />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="reset-data" element={<ResetData />} />
           <Route path="search" element={<SearchResults />} />
         </Route>
 
@@ -51,5 +75,3 @@ function App() {
 }
 
 export default App
-
-

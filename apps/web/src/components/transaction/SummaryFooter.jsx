@@ -1,6 +1,6 @@
 import { formatCurrency } from '@/lib/utils'
 
-const SummaryFooter = ({ totalAmount = 0, onReview }) => {
+const SummaryFooter = ({ totalAmount = 0, onReview, onCancel }) => {
     return (
         <div className="mt-8 lg:mt-12 flex flex-col md:flex-row items-center justify-between p-6 bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-2xl shadow-xl shadow-primary/5">
             <div className="flex items-center gap-6 mb-6 md:mb-0">
@@ -13,7 +13,10 @@ const SummaryFooter = ({ totalAmount = 0, onReview }) => {
                 </div>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                <button className="w-full sm:w-auto px-6 lg:px-8 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer">
+                <button
+                    onClick={onCancel}
+                    className="w-full sm:w-auto px-6 lg:px-8 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
+                >
                     Batal
                 </button>
                 <button

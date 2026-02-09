@@ -90,7 +90,7 @@ const ReceiptUploader = ({ onScanComplete, isScanning, setIsScanning }) => {
                     ref={fileInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    capture="environment"
+
                     className="hidden"
                     onChange={handleFileSelect}
                 />
@@ -101,8 +101,8 @@ const ReceiptUploader = ({ onScanComplete, isScanning, setIsScanning }) => {
                             <span className="material-symbols-outlined text-3xl text-primary animate-spin">sync</span>
                         </div>
                         <div className="space-y-2">
-                            <p className="font-bold text-slate-900 dark:text-white">Analyzing Receipt with OCR...</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Tesseract OCR is extracting text from your receipt</p>
+                            <p className="font-bold text-slate-900 dark:text-white">Analyzing Receipt with AI Agent...</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">AI Agent is reading your receipt</p>
                         </div>
                         <div className="flex gap-1">
                             <span className="size-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }}></span>

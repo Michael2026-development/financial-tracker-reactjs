@@ -1,10 +1,10 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useTransactionStore } from '@/stores/useTransactionStore'
-
-
+import { useTransactions } from '@/hooks/useTransactions'
 
 const ExpenseChart = () => {
-    const { transactions } = useTransactionStore()
+    const { data: transactionsData, isLoading } = useTransactions({ limit: 500 })
+    // API returns array directly
+    const transactions = Array.isArray(transactionsData) ? transactionsData : []
 
     // Process transactions into monthly data
     const getMonthlyData = () => {
@@ -15,19 +15,29 @@ const ExpenseChart = () => {
         const chartData = months.map(m => ({ name: m, expense: 0 }))
 
         transactions.forEach(t => {
-            const date = new Date(t.transaction_date)
+            // Use camelCase: transactionDate, totalPrice from API
+            const date = new Date(t.transactionDate)
             if (date.getFullYear() === currentYear) {
                 const monthIndex = date.getMonth()
-                chartData[monthIndex].expense += t.total_price
+                chartData[monthIndex].expense += (t.totalPrice || 0)
             }
         })
 
-        // Return up to current month or full year? Let's show full year or valid range.
-        // For visual, let's keep it simple.
         return chartData
     }
 
     const data = getMonthlyData()
+
+    if (isLoading) {
+        return (
+            <div className="lg:col-span-2 bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark p-6">
+                <div className="animate-pulse">
+                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-4"></div>
+                    <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="lg:col-span-2 bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark p-6">
@@ -40,8 +50,8 @@ const ExpenseChart = () => {
                     <option>This Year</option>
                 </select>
             </div>
-            <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full" style={{ minHeight: '256px' }}>
+                <ResponsiveContainer width="100%" height={256}>
                     <LineChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
                         <XAxis

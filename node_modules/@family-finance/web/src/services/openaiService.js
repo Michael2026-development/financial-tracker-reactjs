@@ -1,7 +1,7 @@
 /**
  * OpenAI GPT-4 Vision Service for Receipt Scanning
  * 
- * Uses OpenAI GPT-4 Vision API to extract receipt data from images
+ * Uses GPT-4 Vision API to extract receipt data from images
  */
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
@@ -14,8 +14,7 @@ async function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
-            const base64 = reader.result.split(',')[1]
-            resolve(base64)
+            resolve(reader.result)
         }
         reader.onerror = reject
         reader.readAsDataURL(file)
@@ -27,8 +26,11 @@ async function fileToBase64(file) {
  */
 function parseOpenAIResponse(text) {
     try {
+        // Remove markdown code blocks if present
+        let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
         // Try to find JSON in the response
-        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/)
         if (!jsonMatch) {
             throw new Error('No JSON found in response')
         }
@@ -44,7 +46,8 @@ function parseOpenAIResponse(text) {
             quantity: parseInt(item.quantity || item.qty || 1),
             price: parseFloat(item.price || item.unit_price || 0),
             total: parseFloat(item.total || (item.price * item.quantity) || 0),
-            category: 'groceries'
+            category: 'groceries',
+            date: new Date().toISOString().split('T')[0]
         }))
 
         return {
@@ -55,6 +58,7 @@ function parseOpenAIResponse(text) {
         }
     } catch (error) {
         console.error('Failed to parse OpenAI response:', error)
+        console.log('Raw response text:', text)
         throw new Error('Failed to parse AI response. Please try again.')
     }
 }
@@ -69,34 +73,20 @@ export async function scanReceiptWithOpenAI(imageFile) {
         console.error('OpenAI API key not configured')
         return {
             success: false,
-            error: 'AI service not configured. Please contact administrator.'
+            error: 'AI service not configured. Please add VITE_OPENAI_API_KEY to .env file.'
         }
     }
 
     try {
+        console.log('Starting OpenAI GPT-4 Vision scan...')
+
         // Convert image to base64
         const base64Image = await fileToBase64(imageFile)
 
-        // Determine MIME type
-        const mimeType = imageFile.type || 'image/jpeg'
+        // Prepare the prompt
+        const prompt = `Analyze this receipt image and extract all items with their details.
 
-        // Prepare the request
-        const response = await fetch(OPENAI_API_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [{
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'text',
-                            text: `Analyze this receipt image and extract all items with their details.
-
-Return ONLY a valid JSON object in this exact format (no markdown, no explanation):
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks, no additional text):
 {
   "storeName": "name of the store",
   "items": [
@@ -115,18 +105,36 @@ Important:
 - If quantity is not visible, use 1
 - Calculate total = quantity × price
 - Use exact item names from receipt
-- Return valid JSON only`
-                        },
-                        {
-                            type: 'image_url',
-                            image_url: {
-                                url: `data:${mimeType};base64,${base64Image}`
+- Return valid JSON only, no markdown formatting`
+
+        // Make API request to OpenAI
+        const response = await fetch(OPENAI_API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: prompt
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: base64Image
+                                }
                             }
-                        }
-                    ]
-                }],
+                        ]
+                    }
+                ],
                 max_tokens: 2000,
-                temperature: 0.2
+                temperature: 0.3
             })
         })
 
@@ -145,24 +153,47 @@ Important:
             throw new Error('No response from AI')
         }
 
+        console.log('OpenAI response received:', generatedText.substring(0, 200) + '...')
+
         // Parse the response
         const parsedData = parseOpenAIResponse(generatedText)
+
+        if (parsedData.items.length === 0) {
+            return {
+                success: false,
+                error: 'No items found on receipt. Please try a clearer image.'
+            }
+        }
+
+        console.log(`Successfully extracted ${parsedData.items.length} items`)
 
         return {
             success: true,
             data: {
                 ...parsedData,
                 scanDate: new Date().toISOString(),
-                aiProvider: 'OpenAI GPT-4',
-                confidence: 0.90 // OpenAI doesn't provide confidence, using default
+                aiProvider: 'OpenAI GPT-4o Mini',
+                confidence: 0.95
             }
         }
 
     } catch (error) {
         console.error('OpenAI scan error:', error)
+
+        // More helpful error messages
+        let errorMessage = 'Failed to scan receipt. Please try again.'
+
+        if (error.message?.includes('API key')) {
+            errorMessage = 'Invalid API key. Please check your OpenAI API configuration.'
+        } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+            errorMessage = 'API quota exceeded. Please try again later.'
+        } else if (error.message?.includes('parse')) {
+            errorMessage = 'Could not understand receipt format. Please try a clearer image.'
+        }
+
         return {
             success: false,
-            error: error.message || 'Failed to scan receipt. Please try again.'
+            error: errorMessage
         }
     }
 }

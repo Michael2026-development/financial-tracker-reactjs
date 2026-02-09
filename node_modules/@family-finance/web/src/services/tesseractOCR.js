@@ -49,7 +49,6 @@ function parseReceiptText(text) {
         ]
 
         let priceMatch = null
-        let matchedPrice = null
 
         for (const pattern of pricePatterns) {
             const matches = [...line.matchAll(pattern)]

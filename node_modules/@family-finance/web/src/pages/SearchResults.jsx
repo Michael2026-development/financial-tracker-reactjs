@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useSearchStore } from '@/stores/useSearchStore'
-import { useTransactionStore } from '@/stores/useTransactionStore'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { filterTransactions } from '@/lib/searchUtils'
 import { formatCurrency } from '@/lib/utils'
 
@@ -9,7 +10,8 @@ export default function SearchResults() {
     const [searchParams] = useSearchParams()
     const query = searchParams.get('q') || ''
     const { setSearchQuery } = useSearchStore()
-    const { transactions, categories } = useTransactionStore()
+    const { data: transactions = [] } = useTransactions()
+    const { data: categories = [] } = useCategories()
 
     // Update global search store when query changes
     useEffect(() => {
@@ -18,11 +20,11 @@ export default function SearchResults() {
         }
     }, [query, setSearchQuery])
 
-    // Filter transactions based on query
-    const results = filterTransactions(transactions, query)
+    // Filter transactions based on query (pass categories for category name search)
+    const results = filterTransactions(transactions, query, categories)
 
     // Calculate total
-    const totalAmount = results.reduce((sum, t) => sum + t.total_price, 0)
+    const totalAmount = results.reduce((sum, t) => sum + t.totalPrice, 0)
 
     return (
         <div className="flex-1 flex flex-col min-h-full bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-slate-100">
@@ -70,7 +72,7 @@ export default function SearchResults() {
                 {results.length > 0 ? (
                     <div className="grid gap-3">
                         {results.map((transaction) => {
-                            const category = categories.find(c => c.id === transaction.category_id)
+                            const category = categories.find(c => c.id === transaction.categoryId)
                             return (
                                 <div
                                     key={transaction.id}
@@ -91,7 +93,7 @@ export default function SearchResults() {
                                             <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                                                 <span className="flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-sm">calendar_today</span>
-                                                    {new Date(transaction.transaction_date).toLocaleDateString('id-ID')}
+                                                    {new Date(transaction.transactionDate).toLocaleDateString('id-ID')}
                                                 </span>
                                                 {transaction.storeName && (
                                                     <>
@@ -111,7 +113,7 @@ export default function SearchResults() {
                                             </div>
                                         </div>
                                         <div className="text-lg font-black text-slate-900 dark:text-white font-mono shrink-0">
-                                            {formatCurrency(transaction.total_price)}
+                                            {formatCurrency(transaction.totalPrice)}
                                         </div>
                                     </div>
                                 </div>

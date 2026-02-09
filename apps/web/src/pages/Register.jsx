@@ -5,7 +5,7 @@ import clsx from 'clsx'
 
 export default function Register() {
     const navigate = useNavigate()
-    const { login } = useAuthStore()
+    const { register, error, clearError, isLoading } = useAuthStore()
 
     const [formData, setFormData] = useState({
         fullName: '',
@@ -14,8 +14,7 @@ export default function Register() {
         email: '',
         password: ''
     })
-    const [passwordStrength, setPasswordStrength] = useState('weak') // weak, normal, strong
-    const [isLoading, setIsLoading] = useState(false)
+    const [passwordStrength, setPasswordStrength] = useState('weak')
 
     const calculateStrength = (password) => {
         if (!password) return 'none'
@@ -36,18 +35,21 @@ export default function Register() {
         }
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
-        setIsLoading(true)
+        clearError()
 
-        // Simulate registration and auto-login
-        setTimeout(() => {
-            // In real app, you'd register first, then auto-login
-            // For demo, just authenticate with demo credentials
-            login('demo@familyfinance.com', 'password123')
-            setIsLoading(false)
-            navigate('/')
-        }, 1000)
+        const result = await register(formData.fullName, formData.email, formData.password)
+
+        if (result.success) {
+            // Redirect to login page with success message
+            navigate('/login', {
+                state: {
+                    registrationSuccess: true,
+                    email: formData.email
+                }
+            })
+        }
     }
 
     const getStrengthColor = () => {
@@ -86,6 +88,16 @@ export default function Register() {
                         <p className="text-slate-400 text-sm">Join Family Finance to manage your budget</p>
                     </div>
 
+                    {/* Error Message */}
+                    {error && (
+                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                            <div className="flex items-center gap-2 text-red-400">
+                                <span className="material-symbols-outlined text-sm">error</span>
+                                <p className="text-sm font-medium">{error}</p>
+                            </div>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Full Name */}
                         <div className="space-y-1.5">
@@ -123,7 +135,6 @@ export default function Register() {
                                 <input
                                     name="phone"
                                     type="tel"
-                                    required
                                     value={formData.phone}
                                     onChange={handleChange}
                                     className="w-full bg-background-dark/50 border border-border-dark rounded-xl py-2.5 px-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
@@ -152,10 +163,11 @@ export default function Register() {
                                     name="password"
                                     type="password"
                                     required
+                                    minLength={8}
                                     value={formData.password}
                                     onChange={handleChange}
                                     className="w-full bg-background-dark/50 border border-border-dark rounded-xl py-2.5 px-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
-                                    placeholder="Create a password"
+                                    placeholder="Create a password (min 8 characters)"
                                 />
                             </div>
                             {/* Strength Indicator */}
@@ -178,10 +190,17 @@ export default function Register() {
 
                         <button
                             type="submit"
-                            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer mt-6"
+                            disabled={isLoading || formData.password.length < 8}
+                            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            <span>Create Account</span>
-                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                            {isLoading ? (
+                                <span className="material-symbols-outlined animate-spin text-xl">sync</span>
+                            ) : (
+                                <>
+                                    <span>Create Account</span>
+                                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                </>
+                            )}
                         </button>
                     </form>
 

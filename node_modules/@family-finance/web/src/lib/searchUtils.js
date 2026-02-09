@@ -1,8 +1,8 @@
 /**
  * Filter transactions based on search query
- * Searches in: description, category, store name, and item names
+ * Searches in: description, category name, store name, and item names
  */
-export function filterTransactions(transactions, query) {
+export function filterTransactions(transactions, query, categories = []) {
     if (!query || query.trim() === '') return transactions
 
     const lowercaseQuery = query.toLowerCase().trim()
@@ -13,9 +13,12 @@ export function filterTransactions(transactions, query) {
             return true
         }
 
-        // Search in category
-        if (transaction.category?.toLowerCase().includes(lowercaseQuery)) {
-            return true
+        // Search in category name (look up category by categoryId)
+        if (transaction.categoryId && categories.length > 0) {
+            const category = categories.find(c => c.id === transaction.categoryId)
+            if (category?.name?.toLowerCase().includes(lowercaseQuery)) {
+                return true
+            }
         }
 
         // Search in store name

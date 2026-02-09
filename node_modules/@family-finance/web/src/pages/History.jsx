@@ -1,13 +1,20 @@
 import { useState } from 'react'
-import { useTransactionStore } from '@/stores/useTransactionStore'
-import { useSearchStore } from '@/stores/useSearchStore'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { filterTransactions } from '@/lib/searchUtils'
 import HistoryFilters from '@/components/history/HistoryFilters'
 import HistoryTable from '@/components/history/HistoryTable'
+import { formatCurrency } from '@/lib/utils'
 
 export default function History() {
-    const { transactions, categories } = useTransactionStore()
-    const { searchQuery } = useSearchStore()
+    const { data: transactionsData, isLoading: txLoading } = useTransactions({ limit: 500 })
+    const { data: categories, isLoading: catLoading } = useCategories()
+
+    // API returns array directly
+    const transactions = Array.isArray(transactionsData) ? transactionsData : []
+    const categoryList = categories || []
+
+    const [searchQuery, setSearchQuery] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('All Categories')
     const [dateFilter, setDateFilter] = useState('This Month')
 
@@ -30,17 +37,17 @@ export default function History() {
         return { start: new Date(0), end: new Date() }
     }
 
-    // CSV Export function
+    // CSV Export function - use camelCase fields
     const handleExportCSV = () => {
         const headers = ['Date', 'Description', 'Category', 'Amount', 'Items']
         const rows = filteredTransactions.map(t => {
-            const category = categories.find(c => c.id === t.category_id)
+            const category = categoryList.find(c => c.id === t.categoryId)
             const itemsCount = t.items?.length || 0
             return [
-                t.transaction_date,
+                t.transactionDate,
                 t.description,
                 category?.name || 'N/A',
-                t.total_price,
+                t.totalPrice,
                 itemsCount
             ]
         })
@@ -61,18 +68,18 @@ export default function History() {
         document.body.removeChild(link)
     }
 
-    // Filter logic - now uses global search
+    // Filter logic - use camelCase fields
     const filteredTransactions = transactions.filter(transaction => {
         // Category filter
         let matchesCategory = true
         if (categoryFilter !== 'All Categories') {
-            const category = categories.find(c => c.name === categoryFilter)
-            matchesCategory = category && transaction.category_id === category.id
+            const category = categoryList.find(c => c.name === categoryFilter)
+            matchesCategory = category && transaction.categoryId === category.id
         }
 
-        // Date filter
+        // Date filter - use camelCase: transactionDate
         const dateRange = getDateRange(dateFilter)
-        const transactionDate = new Date(transaction.transaction_date)
+        const transactionDate = new Date(transaction.transactionDate)
         const matchesDate = transactionDate >= dateRange.start && transactionDate <= dateRange.end
 
         return matchesCategory && matchesDate
@@ -80,6 +87,21 @@ export default function History() {
 
     // Apply global search filter
     const searchFilteredTransactions = filterTransactions(filteredTransactions, searchQuery)
+
+    const isLoading = txLoading || catLoading
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 flex flex-col min-h-full bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-slate-100">
+                <header className="px-4 lg:px-8 pt-8 pb-4">
+                    <div className="animate-pulse space-y-4">
+                        <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+                        <div className="h-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                    </div>
+                </header>
+            </div>
+        )
+    }
 
     return (
         <div className="flex-1 flex flex-col min-h-full bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-slate-100">
@@ -96,11 +118,11 @@ export default function History() {
                         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium max-w-lg">Advanced audit trail of all verified household financial movements and session logs.</p>
                     </div>
 
-                    {/* Quick Stats Header */}
+                    {/* Quick Stats Header - use camelCase: totalPrice */}
                     <div className="flex items-center gap-3 lg:gap-6 bg-white dark:bg-card-dark p-4 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Volume</span>
-                            <span className="text-lg font-black text-slate-900 dark:text-white font-mono">{formatCurrency(searchFilteredTransactions.reduce((s, t) => s + t.total_price, 0))}</span>
+                            <span className="text-lg font-black text-slate-900 dark:text-white font-mono">{formatCurrency(searchFilteredTransactions.reduce((s, t) => s + (t.totalPrice || 0), 0))}</span>
                         </div>
                         <div className="w-px h-8 bg-slate-200 dark:bg-white/5"></div>
                         <div className="flex flex-col">
@@ -113,12 +135,14 @@ export default function History() {
 
             {/* Filters Bar */}
             <HistoryFilters
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
                 categoryFilter={categoryFilter}
                 setCategoryFilter={setCategoryFilter}
                 dateFilter={dateFilter}
                 setDateFilter={setDateFilter}
                 onExportCSV={handleExportCSV}
-                categories={categories}
+                categories={categoryList}
             />
 
             {/* Content Area */}
@@ -136,5 +160,3 @@ export default function History() {
         </div>
     )
 }
-
-import { formatCurrency } from '@/lib/utils'

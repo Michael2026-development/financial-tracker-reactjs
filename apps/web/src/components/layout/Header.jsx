@@ -2,28 +2,22 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSearchStore } from '@/stores/useSearchStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { useNotificationStore } from '@/stores/useNotificationStore'
+import { useNotifications } from '@/hooks/useNotifications'
 import NotificationDropdown from './NotificationDropdown'
 import SearchModal from '@/components/search/SearchModal'
 
 const Header = ({ onMenuClick }) => {
     const navigate = useNavigate()
-    const { searchQuery, setSearchQuery, clearSearch } = useSearchStore()
+    const { searchQuery, clearSearch } = useSearchStore()
     const { user } = useAuthStore()
-    const { getUnreadCount } = useNotificationStore()
+    const { data: notifications } = useNotifications()
     const [showNotifications, setShowNotifications] = useState(false)
     const [showSearchModal, setShowSearchModal] = useState(false)
     const notificationButtonRef = useRef(null)
 
-    const unreadCount = getUnreadCount()
+    const unreadCount = notifications?.filter(n => !n.read).length || 0
 
-    const handleSearchChange = (e) => {
-        setSearchQuery(e.target.value)
-    }
 
-    const handleClearSearch = () => {
-        clearSearch()
-    }
 
     const handleProfileClick = () => {
         navigate('/settings')

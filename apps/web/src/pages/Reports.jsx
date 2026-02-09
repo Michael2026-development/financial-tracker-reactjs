@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { useTransactionStore } from '@/stores/useTransactionStore'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { formatCurrency } from '@/lib/utils'
 import clsx from 'clsx'
 
@@ -29,9 +30,16 @@ const formatDateIndo = (dateStr) => {
 
 export default function Reports() {
     const [selectedPeriod, setSelectedPeriod] = useState('month')
-    const { transactions, categories } = useTransactionStore()
+
+    // Use API hooks instead of local store
+    const { data: transactionsData, isLoading: transactionsLoading } = useTransactions()
+    const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
+
+    const transactions = transactionsData || []
+    const categories = categoriesData || []
 
     // Filter transactions by selected period
+    // eslint-disable-next-line
     const filteredTransactions = useMemo(() => {
         const now = new Date()
         now.setHours(23, 59, 59, 999)
@@ -39,7 +47,7 @@ export default function Reports() {
         const period = PERIODS.find(p => p.id === selectedPeriod)
 
         return transactions.filter(t => {
-            const tDate = new Date(t.transaction_date)
+            const tDate = new Date(t.transactionDate) // camelCase
 
             if (selectedPeriod === 'today') {
                 const today = new Date()
@@ -51,12 +59,12 @@ export default function Reports() {
             startDate.setHours(0, 0, 0, 0)
 
             return tDate >= startDate && tDate <= now
-        }).sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))
+        }).sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
     }, [transactions, selectedPeriod])
 
     // Calculate total expenses for the period
     const totalExpenses = useMemo(() => {
-        return filteredTransactions.reduce((sum, t) => sum + t.total_price, 0)
+        return filteredTransactions.reduce((sum, t) => sum + t.totalPrice, 0) // camelCase
     }, [filteredTransactions])
 
     // Group transactions by date
@@ -64,7 +72,7 @@ export default function Reports() {
         const groups = {}
 
         filteredTransactions.forEach(t => {
-            const dateKey = t.transaction_date
+            const dateKey = t.transactionDate // camelCase
             if (!groups[dateKey]) {
                 groups[dateKey] = []
             }
@@ -75,17 +83,28 @@ export default function Reports() {
             date,
             ...formatDateIndo(date),
             transactions: txns,
-            dayTotal: txns.reduce((sum, t) => sum + t.total_price, 0)
+            dayTotal: txns.reduce((sum, t) => sum + t.totalPrice, 0) // camelCase
         }))
     }, [filteredTransactions])
 
     // Get category by ID with neon color
-    const getCategory = (categoryId, index) => {
+    const getCategory = (categoryId) => {
         const cat = categories.find(c => c.id === categoryId) || { name: 'Uncategorized', icon: '📦', color: '#94a3b8' }
         return {
             ...cat,
             neonColor: NEON_COLORS[categoryId % NEON_COLORS.length]
         }
+    }
+
+    if (transactionsLoading || categoriesLoading) {
+        return (
+            <div className="px-4 lg:px-8 pt-8 pb-4">
+                <div className="animate-pulse space-y-6">
+                    <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+                    <div className="h-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -151,8 +170,8 @@ export default function Reports() {
                 <div className="flex flex-col gap-3">
                     {groupedTransactions.length > 0 ? (
                         groupedTransactions.flatMap(group =>
-                            group.transactions.map((txn, idx) => {
-                                const category = getCategory(txn.category_id, idx)
+                            group.transactions.map((txn) => {
+                                const category = getCategory(txn.categoryId) // camelCase
                                 return (
                                     <div key={txn.id} className="flex items-center justify-between glass-card p-4 rounded-2xl">
                                         <div className="flex items-center gap-4">
@@ -169,12 +188,12 @@ export default function Reports() {
                                             <div>
                                                 <p className="text-slate-900 dark:text-white font-bold">{txn.description}</p>
                                                 <p className="text-slate-500 dark:text-[#90a4cb] text-xs">
-                                                    {formatDateIndo(txn.transaction_date).formatted} • {category.name}
+                                                    {formatDateIndo(txn.transactionDate).formatted} • {category.name}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-slate-900 dark:text-white font-bold">-{formatCurrency(txn.total_price)}</p>
+                                            <p className="text-slate-900 dark:text-white font-bold">-{formatCurrency(txn.totalPrice)}</p>
                                         </div>
                                     </div>
                                 )

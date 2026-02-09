@@ -1,14 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useCategories } from '@/hooks/useCategories'
 
 const AddItemForm = ({ onAddItem }) => {
+    // Use API hook for categories
+    const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
+    const categories = categoriesData || []
+
+    // Get today's date in YYYY-MM-DD format for default value
+    const getTodayDate = () => {
+        const today = new Date()
+        return today.toISOString().split('T')[0]
+    }
+
     const [newItem, setNewItem] = useState({
         name: '',
         description: '',
         location: '',
         quantity: 1,
         price: '',
-        category: 'groceries'
+        category: '',
+        date: getTodayDate()
     })
+
+    // Set default category when categories load
+    useEffect(() => {
+        if (categories.length > 0 && !newItem.category) {
+            setNewItem(prev => ({ ...prev, category: categories[0].id }))
+        }
+    }, [categories, newItem.category])
 
     const handleAdd = () => {
         if (!newItem.name || !newItem.price) return
@@ -27,7 +46,8 @@ const AddItemForm = ({ onAddItem }) => {
             location: '',
             quantity: 1,
             price: '',
-            category: 'groceries'
+            category: categories.length > 0 ? categories[0].id : '',
+            date: getTodayDate()
         })
     }
 
@@ -37,7 +57,8 @@ const AddItemForm = ({ onAddItem }) => {
                 <span className="material-symbols-outlined text-primary">add_circle</span>
                 Add Item Details
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {/* Row 1: Core Details */}
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Item Name</label>
                     <input
@@ -57,6 +78,41 @@ const AddItemForm = ({ onAddItem }) => {
                         value={newItem.description}
                         onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                     />
+                </div>
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Category</label>
+                    <div className="relative">
+                        <select
+                            className="appearance-none w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all cursor-pointer"
+                            value={newItem.category}
+                            onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+                        >
+                            {categories.length > 0 ? (
+                                categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.icon} {category.name}
+                                    </option>
+                                ))
+                            ) : (
+                                <option value="">No categories available</option>
+                            )}
+                        </select>
+                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
+                    </div>
+                </div>
+
+                {/* Row 2: Context Details */}
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</label>
+                    <div className="relative">
+                        <input
+                            className="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg pl-4 pr-10 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                            type="date"
+                            value={newItem.date}
+                            onChange={(e) => setNewItem({ ...newItem, date: e.target.value })}
+                        />
+                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none">calendar_today</span>
+                    </div>
                 </div>
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Location</label>
@@ -82,23 +138,6 @@ const AddItemForm = ({ onAddItem }) => {
                     </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Category</label>
-                    <div className="relative">
-                        <select
-                            className="appearance-none w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all cursor-pointer"
-                            value={newItem.category}
-                            onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-                        >
-                            <option value="groceries">Groceries</option>
-                            <option value="utilities">Utilities</option>
-                            <option value="dining">Dining Out</option>
-                            <option value="transport">Transportation</option>
-                            <option value="other">Other</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
-                    </div>
-                </div>
-                <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Quantity</label>
                     <input
                         className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
@@ -108,11 +147,13 @@ const AddItemForm = ({ onAddItem }) => {
                         onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })}
                     />
                 </div>
-                <div className="flex flex-col gap-2">
+
+                {/* Row 3: Unit Price with Add Button integrated - Span full */}
+                <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-3">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Unit Price (Rp)</label>
-                    <div className="relative">
+                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
                         <input
-                            className="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg pl-4 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono"
+                            className="flex-1 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-border-dark rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono"
                             placeholder="0"
                             type="number"
                             value={newItem.price}
@@ -120,9 +161,10 @@ const AddItemForm = ({ onAddItem }) => {
                         />
                         <button
                             onClick={handleAdd}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors cursor-pointer flex items-center justify-center"
+                            className="w-full sm:w-auto flex-shrink-0 px-6 sm:px-8 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer flex items-center justify-center gap-2 font-bold whitespace-nowrap shadow-lg shadow-primary/20"
                         >
-                            <span className="material-symbols-outlined text-sm">add</span>
+                            <span className="material-symbols-outlined text-lg">add</span>
+                            <span>Add Item</span>
                         </button>
                     </div>
                 </div>

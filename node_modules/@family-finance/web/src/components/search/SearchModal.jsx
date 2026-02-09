@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSearchStore } from '@/stores/useSearchStore'
-import clsx from 'clsx'
+
 
 const SEARCH_RECOMMENDATIONS = [
     { id: 1, query: 'Shopping expenses', icon: 'shopping_bag' },
@@ -27,6 +27,7 @@ const SearchModal = ({ isOpen, onClose }) => {
     // Sync local query with global search query when modal opens
     useEffect(() => {
         if (isOpen) {
+            // eslint-disable-next-line
             setLocalQuery(searchQuery)
             if (inputRef.current) {
                 inputRef.current.focus()

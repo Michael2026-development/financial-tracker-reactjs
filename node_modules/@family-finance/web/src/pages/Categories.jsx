@@ -1,25 +1,302 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { useTransactionStore } from '@/stores/useTransactionStore'
+import { useCategories, useCategorySpent, useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/hooks/useCategories'
 import { formatCurrency, getBudgetStatus } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
-import Input from '@/components/ui/Input'
+import DeleteConfirmModal from '@/components/modals/DeleteConfirmModal'
+
+// Helper component to display category with spent data
+const CategoryCard = ({ category, onEdit, onDelete }) => {
+    const { data: spentData } = useCategorySpent(category.id)
+    const spent = spentData?.spent || 0
+    // Use camelCase: monthlyBudget from API
+    const { status, label } = getBudgetStatus(spent, category.monthlyBudget)
+    const percentage = Math.min(Math.round((spent / category.monthlyBudget) * 100), 100)
+    const remainingCat = category.monthlyBudget - spent
+
+    // Style config based on status
+    let colorClass = "text-emerald-500"
+    let bgClass = "bg-emerald-500"
+    let bgOpacityClass = "bg-emerald-500/10"
+    let borderColorClass = "hover:border-emerald-500/30"
+
+    if (status === 'WARNING') {
+        colorClass = "text-amber-500"
+        bgClass = "bg-amber-500"
+        bgOpacityClass = "bg-amber-500/10"
+        borderColorClass = "hover:border-amber-500/30"
+    } else if (status === 'DANGER') {
+        colorClass = "text-red-500"
+        bgClass = "bg-red-500"
+        bgOpacityClass = "bg-red-500/10"
+        borderColorClass = "hover:border-red-500/30"
+    }
+
+    return (
+        <div className={`group bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-white/5 flex flex-col gap-5 ${borderColorClass} transition-all shadow-sm`}>
+            <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                    <div className={`size-12 rounded-xl ${bgOpacityClass} flex items-center justify-center`}>
+                        <span className={`material-symbols-outlined ${colorClass} text-2xl`}>{
+                            category.icon && category.icon.length > 2 ? category.icon : 'category'
+                        }</span>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{category.name}</h3>
+                        <p className="text-[#9795c6] text-xs">Monthly Budget</p>
+                    </div>
+                </div>
+                <div className="flex gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={() => onEdit(category)}
+                        className="p-2 text-slate-400 hover:text-primary transition-colors cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                    <button
+                        onClick={() => onDelete(category, spent)}
+                        className="p-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-end">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        {formatCurrency(spent)} <span className="text-slate-400 dark:text-[#9795c6] text-xs font-normal">/ {formatCurrency(category.monthlyBudget)}</span>
+                    </p>
+                    <p className={`text-xs font-bold ${colorClass}`}>{percentage}%</p>
+                </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
+                    <div className={`h-full ${bgClass} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${bgOpacityClass} ${colorClass}`}>
+                        {label.toUpperCase()}
+                    </span>
+                    <p className="text-[#9795c6] text-xs italic">Sisa: {formatCurrency(remainingCat)}</p>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Alert Card component
+const AlertCard = ({ categories, type }) => {
+    const configs = {
+        danger: {
+            icon: 'error',
+            colorClass: 'text-red-500',
+            borderClass: 'border-red-500/30 dark:border-red-500/20',
+            label: 'Over Limit',
+            filter: (cat) => cat.spent > cat.budget
+        },
+        warning: {
+            icon: 'warning',
+            colorClass: 'text-amber-500',
+            borderClass: 'border-amber-500/30 dark:border-amber-500/20',
+            label: 'Near Limit',
+            filter: (cat) => cat.percentage >= 80 && cat.spent <= cat.budget
+        },
+        safe: {
+            icon: 'check_circle',
+            colorClass: 'text-emerald-500',
+            borderClass: 'border-emerald-500/30 dark:border-emerald-500/20',
+            label: 'Safe',
+            filter: (cat) => cat.percentage < 80
+        }
+    }
+
+    const config = configs[type]
+    const filteredCats = categories.filter(config.filter).sort((a, b) => b.percentage - a.percentage)
+    const cat = filteredCats[0]
+
+    return (
+        <div className={`bg-white dark:bg-card-dark p-6 rounded-2xl border-2 ${config.borderClass} shadow-sm`}>
+            <div className="flex items-center gap-2 mb-4">
+                <span className={`material-symbols-outlined ${config.colorClass} text-xl`}>{config.icon}</span>
+                <p className={`${config.colorClass} text-sm font-bold uppercase tracking-wider`}>{config.label}</p>
+            </div>
+            <div className="space-y-4">
+                {cat ? (
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <p className="font-bold text-slate-900 dark:text-white">{cat.name}</p>
+                            <p className={`text-xs font-bold ${config.colorClass}`}>{cat.percentage}%</p>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
+                            <div className={`h-full ${config.colorClass.replace('text-', 'bg-')} rounded-full transition-all duration-500`} style={{ width: `${Math.min(cat.percentage, 100)}%` }}></div>
+                        </div>
+                        <p className={`text-xs ${config.colorClass}`}>
+                            {formatCurrency(cat.spent)} / {formatCurrency(cat.budget)}
+                        </p>
+                    </div>
+                ) : (
+                    <p className="text-xs text-slate-400 italic">No categories {type === 'danger' ? 'over limit' : type === 'warning' ? 'near limit' : 'safe'}</p>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// Individual alert item component - can use hooks properly
+const CategoryAlertItem = ({ category }) => {
+    const { data: spentData } = useCategorySpent(category.id)
+    const spent = spentData?.spent || 0
+    const budget = category.monthlyBudget
+    const percentage = budget > 0 ? Math.round((spent / budget) * 100) : 0
+
+    return {
+        ...category,
+        spent,
+        budget,
+        percentage
+    }
+}
+
+// Budget Alerts component with proper filtering
+const BudgetAlerts = ({ categories }) => {
+    // Component that fetches and displays a single category
+    const AlertCardWithData = ({ title, icon, colorClass, bgClass, borderClass, categoryId }) => {
+        const category = categories.find(c => c.id === categoryId)
+        const { data: spentData } = useCategorySpent(categoryId)
+
+        if (!category) {
+            return (
+                <div className={`bg-white dark:bg-card-dark p-6 rounded-2xl border-2 ${borderClass} shadow-sm`}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className={`material-symbols-outlined ${colorClass} text-xl`}>{icon}</span>
+                        <p className={`${colorClass} text-sm font-bold uppercase tracking-wider`}>{title}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 italic">No categories {title.toLowerCase()}</p>
+                </div>
+            )
+        }
+
+        const spent = spentData?.spent || 0
+        const budget = category.monthlyBudget
+        const percentage = budget > 0 ? Math.round((spent / budget) * 100) : 0
+
+        return (
+            <div className={`bg-white dark:bg-card-dark p-6 rounded-2xl border-2 ${borderClass} shadow-sm`}>
+                <div className="flex items-center gap-2 mb-4">
+                    <span className={`material-symbols-outlined ${colorClass} text-xl`}>{icon}</span>
+                    <p className={`${colorClass} text-sm font-bold uppercase tracking-wider`}>{title}</p>
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl">{category.icon || '📁'}</span>
+                                <p className="font-bold text-slate-900 dark:text-white">{category.name}</p>
+                            </div>
+                            <p className={`text-xs font-bold ${colorClass}`}>{percentage}%</p>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
+                            <div
+                                className={`h-full ${bgClass} rounded-full transition-all duration-500`}
+                                style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                        </div>
+                        <p className={`text-xs ${colorClass}`}>
+                            {formatCurrency(spent)} / {formatCurrency(budget)}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // Component to fetch all category data and determine which to show
+    const CategoryDataCollector = ({ children }) => {
+        // Fetch spent data for ALL categories (this is safe - fixed number of hook calls)
+        const categoriesWithData = categories.map(cat => {
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const { data: spentData } = useCategorySpent(cat.id)
+            return {
+                ...cat,
+                spent: spentData?.spent || 0,
+                percentage: cat.monthlyBudget > 0 ? Math.round(((spentData?.spent || 0) / cat.monthlyBudget) * 100) : 0
+            }
+        })
+
+        // Filter and sort
+        const overLimit = categoriesWithData
+            .filter(cat => cat.spent > cat.monthlyBudget)
+            .sort((a, b) => b.percentage - a.percentage)
+
+        const nearLimit = categoriesWithData
+            .filter(cat => cat.percentage >= 80 && cat.spent <= cat.monthlyBudget)
+            .sort((a, b) => b.percentage - a.percentage)
+
+        const safe = categoriesWithData
+            .filter(cat => cat.percentage < 80)
+            .sort((a, b) => b.percentage - a.percentage)
+
+        return children({
+            overLimitId: overLimit[0]?.id,
+            nearLimitId: nearLimit[0]?.id,
+            safeId: safe[0]?.id
+        })
+    }
+
+    return (
+        <CategoryDataCollector>
+            {({ overLimitId, nearLimitId, safeId }) => (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <AlertCardWithData
+                        title="OVER LIMIT"
+                        icon="error"
+                        colorClass="text-red-500"
+                        bgClass="bg-red-500"
+                        borderClass="border-red-500/30 dark:border-red-500/20"
+                        categoryId={overLimitId}
+                    />
+                    <AlertCardWithData
+                        title="NEAR LIMIT"
+                        icon="warning"
+                        colorClass="text-amber-500"
+                        bgClass="bg-amber-500"
+                        borderClass="border-amber-500/30 dark:border-amber-500/20"
+                        categoryId={nearLimitId}
+                    />
+                    <AlertCardWithData
+                        title="SAFE"
+                        icon="check_circle"
+                        colorClass="text-emerald-500"
+                        bgClass="bg-emerald-500"
+                        borderClass="border-emerald-500/30 dark:border-emerald-500/20"
+                        categoryId={safeId}
+                    />
+                </div>
+            )}
+        </CategoryDataCollector>
+    )
+}
 
 export default function Categories() {
-    const { categories, getCategorySpent, addCategory, updateCategory, deleteCategory } = useTransactionStore()
+    const { data: categories, isLoading } = useCategories()
+    const createCategory = useCreateCategory()
+    const updateCategory = useUpdateCategory()
+    const deleteCategoryMutation = useDeleteCategory()
+
+    const categoryList = categories || []
+
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingId, setEditingId] = useState(null)
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, categoryId: null, categoryData: null })
     const [categoryForm, setCategoryForm] = useState({
         name: '',
         icon: '',
         color: '#10b981',
-        monthly_budget: ''
+        monthlyBudget: ''
     })
-
 
     const handleOpenAdd = () => {
         setEditingId(null)
-        setCategoryForm({ name: '', icon: '', color: '#10b981', monthly_budget: '' })
+        setCategoryForm({ name: '', icon: '', color: '#10b981', monthlyBudget: '' })
         setIsModalOpen(true)
     }
 
@@ -29,33 +306,80 @@ export default function Categories() {
             name: category.name,
             icon: category.icon,
             color: category.color,
-            monthly_budget: category.monthly_budget
+            monthlyBudget: category.monthlyBudget
         })
         setIsModalOpen(true)
     }
 
-    const handleSaveCategory = () => {
-        if (!categoryForm.name || !categoryForm.monthly_budget) return
+    const handleSaveCategory = async () => {
+        if (!categoryForm.name || !categoryForm.monthlyBudget) return
 
         const payload = {
             ...categoryForm,
-            monthly_budget: Number(categoryForm.monthly_budget)
+            monthlyBudget: Number(categoryForm.monthlyBudget)
         }
 
-        if (editingId) {
-            updateCategory(editingId, payload)
-        } else {
-            addCategory(payload)
-        }
-
-        setIsModalOpen(false)
-    }
-
-    const handleDelete = (id) => {
-        if (window.confirm('Are you sure you want to delete this category?')) {
-            deleteCategory(id)
+        try {
+            if (editingId) {
+                // Pass as { id, data } to match mutation function signature
+                await updateCategory.mutateAsync({ id: editingId, data: payload })
+            } else {
+                await createCategory.mutateAsync(payload)
+            }
+            setIsModalOpen(false)
+        } catch (error) {
+            console.error('Failed to save category:', error)
         }
     }
+
+    const handleDelete = (category, spent) => {
+        setDeleteModal({
+            isOpen: true,
+            categoryId: category.id,
+            categoryData: {
+                name: category.name,
+                budget: category.monthlyBudget,
+                spent: spent,
+                icon: category.icon
+            }
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        if (deleteModal.categoryId) {
+            try {
+                await deleteCategoryMutation.mutateAsync(deleteModal.categoryId)
+            } catch (error) {
+                console.error('Failed to delete category:', error)
+            }
+        }
+        setDeleteModal({ isOpen: false, categoryId: null, categoryData: null })
+    }
+
+    if (isLoading) {
+        return (
+            <div className="px-4 lg:px-8 pt-8 pb-4">
+                <div className="animate-pulse space-y-6">
+                    <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                        <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                        <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // Prepare categories with spent data for alerts (we'll fetch individually)
+    // For the alert cards, we need pre-computed spent values
+    // This is a simplified version - in production you'd want to batch this
+    const categoriesWithSpent = categoryList.map(cat => ({
+        ...cat,
+        spent: 0, // Will be fetched individually by each card
+        budget: cat.monthlyBudget,
+        percentage: 0
+    }))
 
     return (
         <div className="px-4 lg:px-8 pt-8 pb-4 shrink-0">
@@ -72,203 +396,19 @@ export default function Categories() {
                 </div>
             </header>
 
-            {/* Budget Alerts */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                {/* Over Limit Alert */}
-                <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border-2 border-red-500/30 dark:border-red-500/20 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-red-500 text-xl">error</span>
-                        <p className="text-red-500 text-sm font-bold uppercase tracking-wider">Over Limit</p>
-                    </div>
-                    <div className="space-y-4">
-                        {(() => {
-                            const overLimitCats = categories
-                                .map(cat => ({
-                                    ...cat,
-                                    spent: getCategorySpent(cat.id),
-                                    percentage: Math.round((getCategorySpent(cat.id) / cat.monthly_budget) * 100)
-                                }))
-                                .filter(cat => cat.spent > cat.monthly_budget)
-                                .sort((a, b) => b.percentage - a.percentage);
-
-                            if (overLimitCats.length > 0) {
-                                const cat = overLimitCats[0];
-                                return (
-                                    <div key={cat.id} className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-bold text-slate-900 dark:text-white">{cat.name}</p>
-                                            <p className="text-xs font-bold text-red-500">{cat.percentage}%</p>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
-                                            <div className="h-full bg-red-500 rounded-full transition-all duration-500" style={{ width: `100%` }}></div>
-                                        </div>
-                                        <p className="text-xs text-red-500">
-                                            {formatCurrency(cat.spent)} / {formatCurrency(cat.monthly_budget)}
-                                        </p>
-                                    </div>
-                                );
-                            }
-                            return <p className="text-xs text-slate-400 italic">No categories over limit</p>;
-                        })()}
-                    </div>
-                </div>
-
-                {/* Warning Alert */}
-                <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border-2 border-amber-500/30 dark:border-amber-500/20 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-amber-500 text-xl">warning</span>
-                        <p className="text-amber-500 text-sm font-bold uppercase tracking-wider">Near Limit</p>
-                    </div>
-                    <div className="space-y-4">
-                        {(() => {
-                            const nearLimitCats = categories
-                                .map(cat => ({
-                                    ...cat,
-                                    spent: getCategorySpent(cat.id),
-                                    percentage: Math.round((getCategorySpent(cat.id) / cat.monthly_budget) * 100)
-                                }))
-                                .filter(cat => cat.percentage >= 80 && cat.spent <= cat.monthly_budget)
-                                .sort((a, b) => b.percentage - a.percentage);
-
-                            if (nearLimitCats.length > 0) {
-                                const cat = nearLimitCats[0];
-                                return (
-                                    <div key={cat.id} className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-bold text-slate-900 dark:text-white">{cat.name}</p>
-                                            <p className="text-xs font-bold text-amber-500">{cat.percentage}%</p>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
-                                            <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${cat.percentage}%` }}></div>
-                                        </div>
-                                        <p className="text-xs text-amber-500">
-                                            {formatCurrency(cat.spent)} / {formatCurrency(cat.monthly_budget)}
-                                        </p>
-                                    </div>
-                                );
-                            }
-                            return <p className="text-xs text-slate-400 italic">No categories near limit</p>;
-                        })()}
-                    </div>
-                </div>
-
-                {/* Safe Alert */}
-                <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-500/20 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-emerald-500 text-xl">check_circle</span>
-                        <p className="text-emerald-500 text-sm font-bold uppercase tracking-wider">Safe</p>
-                    </div>
-                    <div className="space-y-4">
-                        {(() => {
-                            const safeCats = categories
-                                .map(cat => ({
-                                    ...cat,
-                                    spent: getCategorySpent(cat.id),
-                                    percentage: Math.round((getCategorySpent(cat.id) / cat.monthly_budget) * 100)
-                                }))
-                                .filter(cat => cat.percentage < 80)
-                                .sort((a, b) => b.percentage - a.percentage);
-
-                            if (safeCats.length > 0) {
-                                const cat = safeCats[0];
-                                return (
-                                    <div key={cat.id} className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-bold text-slate-900 dark:text-white">{cat.name}</p>
-                                            <p className="text-xs font-bold text-emerald-500">{cat.percentage}%</p>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
-                                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${cat.percentage}%` }}></div>
-                                        </div>
-                                        <p className="text-xs text-emerald-500">
-                                            {formatCurrency(cat.spent)} / {formatCurrency(cat.monthly_budget)}
-                                        </p>
-                                    </div>
-                                );
-                            }
-                            return <p className="text-xs text-slate-400 italic">No safe categories</p>;
-                        })()}
-                    </div>
-                </div>
-            </div>
+            {/* Budget Alerts - Functional */}
+            <BudgetAlerts categories={categoryList} />
 
             {/* Category Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {categories.map((category) => {
-                    const spent = getCategorySpent(category.id)
-                    const { status, label } = getBudgetStatus(spent, category.monthly_budget)
-                    const percentage = Math.min(Math.round((spent / category.monthly_budget) * 100), 100)
-                    const remainingCat = category.monthly_budget - spent
-
-                    // Style config based on status
-                    let colorClass = "text-emerald-500"
-                    let bgClass = "bg-emerald-500"
-                    let bgOpacityClass = "bg-emerald-500/10"
-                    let borderColorClass = "hover:border-emerald-500/30"
-
-                    if (status === 'WARNING') {
-                        colorClass = "text-amber-500"
-                        bgClass = "bg-amber-500"
-                        bgOpacityClass = "bg-amber-500/10"
-                        borderColorClass = "hover:border-amber-500/30"
-                    } else if (status === 'DANGER') {
-                        colorClass = "text-red-500"
-                        bgClass = "bg-red-500"
-                        bgOpacityClass = "bg-red-500/10"
-                        borderColorClass = "hover:border-red-500/30"
-                    }
-
-                    return (
-                        <div key={category.id} className={`group bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-white/5 flex flex-col gap-5 ${borderColorClass} transition-all shadow-sm`}>
-                            <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-4">
-                                    <div className={`size-12 rounded-xl ${bgOpacityClass} flex items-center justify-center`}>
-                                        <span className={`material-symbols-outlined ${colorClass} text-2xl`}>{
-                                            // Simple check if it's an emoji or material name
-                                            category.icon && category.icon.length > 2 ? category.icon : 'category'
-                                        }</span>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{category.name}</h3>
-                                        <p className="text-[#9795c6] text-xs">Monthly Budget</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-1 opacity-60 hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => handleOpenEdit(category)}
-                                        className="p-2 text-slate-400 hover:text-primary transition-colors cursor-pointer"
-                                    >
-                                        <span className="material-symbols-outlined text-xl">edit</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(category.id)}
-                                        className="p-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                                    >
-                                        <span className="material-symbols-outlined text-xl">delete</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <div className="flex justify-between items-end">
-                                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                                        {formatCurrency(spent)} <span className="text-slate-400 dark:text-[#9795c6] text-xs font-normal">/ {formatCurrency(category.monthly_budget)}</span>
-                                    </p>
-                                    <p className={`text-xs font-bold ${colorClass}`}>{percentage}%</p>
-                                </div>
-                                <div className="h-2 w-full bg-slate-100 dark:bg-[#383663] rounded-full overflow-hidden">
-                                    <div className={`h-full ${bgClass} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div>
-                                </div>
-                                <div className="flex justify-between items-center mt-1">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${bgOpacityClass} ${colorClass}`}>
-                                        {label.toUpperCase()}
-                                    </span>
-                                    <p className="text-[#9795c6] text-xs italic">Sisa: {formatCurrency(remainingCat)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                })}
+                {categoryList.map((category) => (
+                    <CategoryCard
+                        key={category.id}
+                        category={category}
+                        onEdit={handleOpenEdit}
+                        onDelete={handleDelete}
+                    />
+                ))}
 
                 {/* Placeholder/Empty State Card for Adding New */}
                 <div
@@ -286,72 +426,133 @@ export default function Categories() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                className="bg-[#1a1a35] border-[#383663] !p-0 max-w-[500px]"
+                className="!p-0 max-w-[500px] bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
             >
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-[#383663]">
-                    <h2 className="text-white tracking-tight text-[22px] font-extrabold leading-tight uppercase">
+                <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                         {editingId ? "Edit Kategori" : "Tambah Kategori Baru"}
-                    </h2>
+                    </h3>
                     <button
                         onClick={() => setIsModalOpen(false)}
-                        className="text-[#9795c6] hover:text-white transition-colors cursor-pointer"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                     >
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5">
-                    <div className="space-y-4">
-                        <Input
-                            label="Nama Kategori"
-                            placeholder="Contoh: Belanja"
+                {/* Form Content */}
+                <div className="p-8 space-y-6">
+                    {/* Nama Kategori */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Nama Kategori
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Masukkan nama kategori"
                             value={categoryForm.name}
                             onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                            className="bg-[#1c1b3a] border-[#383663] text-white placeholder:text-[#5c5b8f] focus:border-primary focus:ring-primary/20"
-                        />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Input
-                                label="Icon (Material Symbol)"
-                                placeholder="shopping_cart"
-                                value={categoryForm.icon}
-                                onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
-                                className="bg-[#1c1b3a] border-[#383663] text-white placeholder:text-[#5c5b8f]"
-                            />
-                            <Input
-                                label="Warna (Hex)"
-                                placeholder="#10b981"
-                                value={categoryForm.color}
-                                onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
-                                className="bg-[#1c1b3a] border-[#383663] text-white placeholder:text-[#5c5b8f]"
-                            />
-                        </div>
-                        <Input
-                            label="Budget Bulanan"
-                            type="number"
-                            placeholder="0"
-                            value={categoryForm.monthly_budget}
-                            onChange={(e) => setCategoryForm({ ...categoryForm, monthly_budget: e.target.value })}
-                            className="bg-[#1c1b3a] border-[#383663] text-white placeholder:text-[#5c5b8f]"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-800 placeholder:text-slate-400 outline-none"
                         />
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 pt-6 bg-[#1c1b3a]/50 -mx-6 px-6 pb-6 border-t border-[#383663] justify-end">
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="flex min-w-[120px] cursor-pointer items-center justify-center rounded-lg h-12 px-6 bg-transparent border border-[#383663] hover:bg-[#272546] text-white text-base font-bold transition-all"
-                        >
-                            Batal
-                        </button>
-                        <button
-                            onClick={handleSaveCategory}
-                            className="flex min-w-[140px] cursor-pointer items-center justify-center rounded-lg h-12 px-6 bg-primary hover:bg-opacity-90 text-white text-base font-bold shadow-lg shadow-primary/20 transition-all"
-                        >
-                            Simpan
-                        </button>
+                    {/* Icon & Warna Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Icon */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                Icon (Emoji)
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl">
+                                    {categoryForm.icon || '📁'}
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="🛒 (paste any emoji)"
+                                    value={categoryForm.icon}
+                                    onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                                    className="w-full pl-14 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-800 placeholder:text-slate-400 outline-none"
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Tip: Copy and paste any emoji or icon (e.g., 🛒 🍔 💰 🏠 ✈️)
+                            </p>
+                        </div>
+
+                        {/* Warna */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                Warna (Hex)
+                            </label>
+                            <div className="relative flex items-center">
+                                <div
+                                    className="absolute left-4 size-5 rounded-md border border-slate-200 dark:border-slate-600"
+                                    style={{ backgroundColor: categoryForm.color || '#10b981' }}
+                                ></div>
+                                <input
+                                    type="text"
+                                    placeholder="#10b981"
+                                    value={categoryForm.color}
+                                    onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-800 placeholder:text-slate-400 outline-none font-mono"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Budget Bulanan */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Budget Bulanan
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                                Rp
+                            </span>
+                            <input
+                                type="number"
+                                placeholder="0"
+                                value={categoryForm.monthlyBudget || ''}
+                                onChange={(e) => setCategoryForm({ ...categoryForm, monthlyBudget: e.target.value })}
+                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-800 placeholder:text-slate-400 outline-none"
+                            />
+                        </div>
                     </div>
                 </div>
+
+                {/* Footer Actions */}
+                <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                        onClick={() => setIsModalOpen(false)}
+                        className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleSaveCategory}
+                        disabled={createCategory.isPending || updateCategory.isPending}
+                        className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 disabled:opacity-50"
+                    >
+                        {createCategory.isPending || updateCategory.isPending ? 'Saving...' : 'Simpan'}
+                    </button>
+                </div>
             </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmModal
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ isOpen: false, categoryId: null, categoryData: null })}
+                onConfirm={handleConfirmDelete}
+                title="Delete Category?"
+                itemName={deleteModal.categoryData?.name}
+                itemDetails={deleteModal.categoryData ? {
+                    budget: deleteModal.categoryData.budget,
+                    spent: deleteModal.categoryData.spent,
+                    icon: deleteModal.categoryData.icon
+                } : null}
+            />
         </div>
     )
 }
