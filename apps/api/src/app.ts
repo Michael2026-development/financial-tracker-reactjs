@@ -12,6 +12,9 @@ export function createApp() {
     // Security middleware
     app.use(helmet());
 
+    // Trust Proxy for Railway/Vercel
+    app.set("trust proxy", 1);
+
     // CORS configuration - support multiple origins from environment
     const allowedOrigins: string[] = [
         process.env.FRONTEND_URL || "http://localhost:5173",
