@@ -31,6 +31,12 @@ export const auth = betterAuth({
         "https://financial-tracker-weld.vercel.app",
         "https://financial-tracker-bu1g410nr-michaels-projects-85e1584b.vercel.app"
     ].filter(Boolean) as string[],
+    advanced: {
+        defaultCookieAttributes: {
+            sameSite: "none",
+            secure: true,
+        },
+    },
 });
 
 export type Session = typeof auth.$Infer.Session;
