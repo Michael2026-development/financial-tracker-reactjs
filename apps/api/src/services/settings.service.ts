@@ -13,7 +13,7 @@ export interface UpdateSettingsDto {
 
 export interface UpdateProfileDto {
     name?: string;
-    image?: string;
+    image?: string | null;
 }
 
 export class SettingsService {
